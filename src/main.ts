@@ -151,6 +151,14 @@ const cellPipeline: GPURenderPipeline = device.createRenderPipeline({
 renderPass.setPipeline(cellPipeline);
 renderPass.setVertexBuffer(0, vertexBuffer);
 renderPass.draw(vertices.length / 2); // 6 vertices
+// This supplies WebGPU with all the information necessary to draw your square. 
+// First, you use setPipeline() to indicate which pipeline should be used to draw with. 
+// This includes the shaders that are used, the layout of the vertex data, and other relevant state data.
+
+// Next, you call setVertexBuffer() with the buffer containing the vertices for your square. 
+// You call it with 0 because this buffer corresponds to the 0th element in the current pipeline's vertex.buffers definition.
+
+// draw() takes the number of vertices to render
 
 renderPass.end();
 
