@@ -14,8 +14,8 @@ const GRID_SIZE = 32;
 
 // const cellShader = await shaders[0].text();
 
-import vertexShader from "../public/shaders/vertex.wgsl?raw"; // this is vite specific import stuff
-import fragmentShader from "../public/shaders/fragment.wgsl?raw"; // this is vite specific import stuff
+import vertexShader from "./shaders/vertex.wgsl?raw"; // this is vite specific import stuff
+import fragmentShader from "./shaders/fragment.wgsl?raw"; // this is vite specific import stuff
 
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
