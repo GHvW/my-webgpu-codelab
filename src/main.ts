@@ -5,6 +5,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   </div>
 `
 
+const GRID_SIZE = 32;
+
 // const shaders =
 //     await Promise.all([
 //         fetch("./shaders/cellShader.wgsl")
@@ -82,14 +84,14 @@ const renderPass = encoder.beginRenderPass({
 
 // You still need to turn it into triangles
 const vertices = new Float32Array([
-//     X,    Y,
+    //     X,    Y,
     -0.8, -0.8, // Triangle 1 (Blue)
-     0.8, -0.8,
-     0.8,  0.8,
+    0.8, -0.8,
+    0.8, 0.8,
 
     -0.8, -0.8, // Triangle 2 (Red)
-     0.8,  0.8,
-    -0.8,  0.8,
+    0.8, 0.8,
+    -0.8, 0.8,
 ]);
 // Aside: points are repeated?
 // you don't have to:
@@ -148,9 +150,44 @@ const cellPipeline: GPURenderPipeline = device.createRenderPipeline({
     }
 });
 
+
+
+
+
+// Create a uniform buffer that describes the grid.
+const uniformArray = new Float32Array([GRID_SIZE, GRID_SIZE]);
+const uniformBuffer: GPUBuffer = device.createBuffer({
+    label: "Grid Uniforms",
+    size: uniformArray.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+
+device.queue.writeBuffer(uniformBuffer, 0, uniformArray);
+
+// getBindGroupLayout(0), where the 0 corresponds to the @group(0) that you typed in the vertex shader.
+const bindGroup: GPUBindGroup = device.createBindGroup({
+    label: "Cell renderer bind group",
+    layout: cellPipeline.getBindGroupLayout(0),
+    entries: [{
+        binding: 0,
+        resource: { buffer: uniformBuffer }
+    }],
+});
+
+
+
+
 renderPass.setPipeline(cellPipeline);
 renderPass.setVertexBuffer(0, vertexBuffer);
-renderPass.draw(vertices.length / 2); // 6 vertices
+
+// The 0 passed as the first argument corresponds to the @group(0) in the shader code. 
+// You're saying that each @binding that's part of @group(0) uses the resources in this bind group
+renderPass.setBindGroup(0, bindGroup);
+
+// renderPass.draw(vertices.length / 2); // 6 vertices
+// This tells the system that you want it to draw the six (vertices.length / 2) vertices of your square 16 (GRID_SIZE * GRID_SIZE) times
+// renderPass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE); - but this will just show what looks like one square on the screen 
+renderPass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE /* instance count - which will translate to an instance_index in the vertex shader */);
 // This supplies WebGPU with all the information necessary to draw your square. 
 // First, you use setPipeline() to indicate which pipeline should be used to draw with. 
 // This includes the shaders that are used, the layout of the vertex data, and other relevant state data.
@@ -172,7 +209,7 @@ const commandBuffer = encoder.finish();
 // Once you submit a command buffer, it cannot be used again, so there's no need to hold on to it. 
 device.queue.submit([commandBuffer]);
 
-// If you want to submit more commands, you need to build another command buffer. 
+// If you want to submit more commands, you need to build another command buffer.
 // That's why it's fairly common to see those two steps collapsed into one like this:
 // device.queue.submit([encoder.finish()]);
 
