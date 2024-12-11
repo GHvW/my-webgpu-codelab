@@ -67,7 +67,7 @@ const renderPass = encoder.beginRenderPass({
         // The clearValue instructs the render pass which color it should use when performing the clear operation at the beginning of the pass. 
         // The dictionary passed into it contains four values: r for red, g for green, b for blue, and a for alpha (transparency). 
         // Each value can range from 0 to 1, and together they describe the value of that color channel0
-        clearValue: { r: 0.25, g: 0.75, b: 0.4, a: 1 },
+        clearValue: { r: 0.0, g: 0.0, b: 0.50196, a: 1 },
         // A storeOp value of "store" indicates that once the render pass is finished you want the results of any drawing done during the render pass saved into the texture.
         storeOp: "store",
     }]
