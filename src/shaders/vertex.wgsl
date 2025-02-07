@@ -1,5 +1,15 @@
 // @location() attribute and type that match what you described in the vertexBufferLayout
 
+
+struct VertexInput {
+    @location(0) pos: vec2f,
+    @builtin(instance_index) instance: u32,
+}
+
+struct VertexOutput {
+    @builtin(position) pos: vec4f,
+}
+
 // This defines a uniform in your shader called grid, 
 // which is a 2D float vector that matches the array that you just copied into the **uniform buffer**.
 // elsewhere in the shader code, you can use the grid vector however you need
@@ -9,9 +19,8 @@
 // Part 5 vertex shader - manipulation
 @vertex
 fn vertexMain(
-    @location(0) pos: vec2f,
-    @builtin(instance_index) instance: u32
-) -> @builtin(position) vec4f {
+    input: VertexInput
+) -> VertexOutput {
 
     let i = f32(instance);
     // Compute the cell coordinate from the instance_index
@@ -20,7 +29,9 @@ fn vertexMain(
     let cellOffset = cell / grid * 2;
     let gridPos = (pos + 1) / grid - 1 + cellOffset;
 
-    return vec4f(gridPos, 0, 1);
+    var vertexOutput: VertexOutput;
+    output.pos = vec4f(gridPos, 0, 1);
+    return output;
 }
 
 // Part 5 vertex shader
