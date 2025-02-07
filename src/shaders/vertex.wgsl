@@ -8,6 +8,7 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) pos: vec4f,
+    @location(0) cell: vec2f,
 }
 
 // This defines a uniform in your shader called grid, 
@@ -22,15 +23,16 @@ fn vertexMain(
     input: VertexInput
 ) -> VertexOutput {
 
-    let i = f32(instance);
+    let i = f32(input.instance);
     // Compute the cell coordinate from the instance_index
     let cell = vec2f(i % grid.x, floor(i / grid.x));
 
     let cellOffset = cell / grid * 2;
-    let gridPos = (pos + 1) / grid - 1 + cellOffset;
+    let gridPos = (input.pos + 1) / grid - 1 + cellOffset;
 
-    var vertexOutput: VertexOutput;
+    var output: VertexOutput;
     output.pos = vec4f(gridPos, 0, 1);
+    output.cell = cell;
     return output;
 }
 
