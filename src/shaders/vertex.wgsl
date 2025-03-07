@@ -15,7 +15,8 @@ struct VertexOutput {
 // which is a 2D float vector that matches the array that you just copied into the **uniform buffer**.
 // elsewhere in the shader code, you can use the grid vector however you need
 @group(0) @binding(0) var<uniform> grid: vec2f;
-
+//array of u32 values, in order to match the Uint32Array in JavaScript.
+@group(0) @binding(1) var<storage> cellState: array<u32>;
 
 // Part 5 vertex shader - manipulation
 @vertex
@@ -26,9 +27,10 @@ fn vertexMain(
     let i = f32(input.instance);
     // Compute the cell coordinate from the instance_index
     let cell = vec2f(i % grid.x, floor(i / grid.x));
+    let state = f32(cellState[input.instance]);
 
     let cellOffset = cell / grid * 2;
-    let gridPos = (input.pos + 1) / grid - 1 + cellOffset;
+    let gridPos = (input.pos * state + 1) / grid - 1 + cellOffset;
 
     var output: VertexOutput;
     output.pos = vec4f(gridPos, 0, 1);

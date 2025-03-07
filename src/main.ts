@@ -150,6 +150,22 @@ const cellPipeline: GPURenderPipeline = device.createRenderPipeline({
     }
 });
 
+// active state of each cell
+const cellState = new Uint32Array(GRID_SIZE * GRID_SIZE);
+
+// storage buffer
+const cellStateStorage: GPUBuffer = device.createBuffer({
+    label: "Cell state",
+    size: cellState.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST, // this is what makes it a storage buffer
+});
+
+// Mark every third cell of the grid as active.
+for (let i = 0; i < cellState.length; i += 3) {
+    cellState[i] = 1;
+}
+device.queue.writeBuffer(cellStateStorage, 0, cellState);
+
 
 
 
@@ -171,6 +187,9 @@ const bindGroup: GPUBindGroup = device.createBindGroup({
     entries: [{
         binding: 0,
         resource: { buffer: uniformBuffer }
+    }, {
+        binding: 1, // Make sure that the binding of the new entry matches the @binding() of the corresponding value in the shader!
+        resource: { buffer: cellStateStorage }
     }],
 });
 
