@@ -150,24 +150,6 @@ const cellPipeline: GPURenderPipeline = device.createRenderPipeline({
     }
 });
 
-// active state of each cell
-const cellState = new Uint32Array(GRID_SIZE * GRID_SIZE);
-
-// storage buffer
-const cellStateStorage: GPUBuffer = device.createBuffer({
-    label: "Cell state",
-    size: cellState.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST, // this is what makes it a storage buffer
-});
-
-// Mark every third cell of the grid as active.
-for (let i = 0; i < cellState.length; i += 3) {
-    cellState[i] = 1;
-}
-device.queue.writeBuffer(cellStateStorage, 0, cellState);
-
-
-
 
 
 // Create a uniform buffer that describes the grid.
@@ -180,55 +162,95 @@ const uniformBuffer: GPUBuffer = device.createBuffer({
 
 device.queue.writeBuffer(uniformBuffer, 0, uniformArray);
 
+
+// active state of each cell
+const cellState = new Uint32Array(GRID_SIZE * GRID_SIZE);
+
+// storage buffer - two for ping-pong pattern
+const cellStateStorage: Array<GPUBuffer> = [
+    device.createBuffer({
+        label: "Cell State A",
+        size: cellState.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST, // this is what makes it a storage buffer
+    }),
+    device.createBuffer({
+        label: "Cell State B",
+        size: cellState.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    }),
+];
+
+// Mark every third cell of the grid as active.
+for (let i = 0; i < cellState.length; i += 3) {
+    cellState[i] = 1;
+}
+// once written to the buffer, its in the GPU memory, so we can reuse the cellState array once written
+device.queue.writeBuffer(cellStateStorage[0], 0, cellState);
+
+// Mark every other cell of the second grid as active.
+for (let i = 0; i < cellState.length; i++) {
+    cellState[i] = i % 2;
+}
+device.queue.writeBuffer(cellStateStorage[1], 0, cellState);
+
+
+
 // getBindGroupLayout(0), where the 0 corresponds to the @group(0) that you typed in the vertex shader.
-const bindGroup: GPUBindGroup = device.createBindGroup({
-    label: "Cell renderer bind group",
-    layout: cellPipeline.getBindGroupLayout(0),
-    entries: [{
-        binding: 0,
-        resource: { buffer: uniformBuffer }
-    }, {
-        binding: 1, // Make sure that the binding of the new entry matches the @binding() of the corresponding value in the shader!
-        resource: { buffer: cellStateStorage }
-    }],
-});
+const bindGroups: Array<GPUBindGroup> = [
+    device.createBindGroup({
+        label: "Cell renderer bind group A",
+        layout: cellPipeline.getBindGroupLayout(0),
+        entries: [{
+            binding: 0,
+            resource: { buffer: uniformBuffer }
+        }, {
+            binding: 1, // Make sure that the binding of the new entry matches the @binding() of the corresponding value in the shader!
+            resource: { buffer: cellStateStorage[0] }
+        }],
+    }),
+    device.createBindGroup({
+        label: "Cell renderer bind group B",
+        layout: cellPipeline.getBindGroupLayout(0),
+        entries: [{
+            binding: 0,
+            resource: { buffer: uniformBuffer }
+        }, {
+            binding: 1, // Make sure that the binding of the new entry matches the @binding() of the corresponding value in the shader!
+            resource: { buffer: cellStateStorage[1] }
+        }],
+    }),
+];
 
 
+const UPDATE_INTERVAL = 400; // Update every 200ms (5 times/sec)
+let step = 0; // Track how many simulation steps have been run
 
 
-renderPass.setPipeline(cellPipeline);
-renderPass.setVertexBuffer(0, vertexBuffer);
+// Move all of our rendering code into a function
+function updateGrid() {
+    step++; // Increment the step count
 
-// The 0 passed as the first argument corresponds to the @group(0) in the shader code. 
-// You're saying that each @binding that's part of @group(0) uses the resources in this bind group
-renderPass.setBindGroup(0, bindGroup);
+    // Start a render pass 
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+            view: context.getCurrentTexture().createView(),
+            loadOp: "clear",
+            clearValue: { r: 0, g: 0, b: 0.4, a: 1.0 },
+            storeOp: "store",
+        }]
+    });
 
-// renderPass.draw(vertices.length / 2); // 6 vertices
-// This tells the system that you want it to draw the six (vertices.length / 2) vertices of your square 16 (GRID_SIZE * GRID_SIZE) times
-// renderPass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE); - but this will just show what looks like one square on the screen 
-renderPass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE /* instance count - which will translate to an instance_index in the vertex shader */);
-// This supplies WebGPU with all the information necessary to draw your square. 
-// First, you use setPipeline() to indicate which pipeline should be used to draw with. 
-// This includes the shaders that are used, the layout of the vertex data, and other relevant state data.
+    // Draw the grid.
+    pass.setPipeline(cellPipeline);
+    pass.setBindGroup(0, bindGroups[step % 2]);
+    pass.setVertexBuffer(0, vertexBuffer);
+    pass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE);
 
-// Next, you call setVertexBuffer() with the buffer containing the vertices for your square. 
-// You call it with 0 because this buffer corresponds to the 0th element in the current pipeline's vertex.buffers definition.
+    // End the render pass and submit the command buffer
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+}
 
-// draw() takes the number of vertices to render
-
-renderPass.end();
-
-// It's important to know that simply making these calls does not cause the GPU to actually do anything. They're just recording commands for the GPU to do later.``
-
-// In order to create a GPUCommandBuffer, call finish() on the command encoder. The command buffer is an opaque handle to the recorded commands.
-const commandBuffer = encoder.finish();
-
-// The queue performs all GPU commands, ensuring that their execution is well ordered and properly synchronized. 
-// The queue's submit() method takes in an array of command buffers
-// Once you submit a command buffer, it cannot be used again, so there's no need to hold on to it. 
-device.queue.submit([commandBuffer]);
-
-// If you want to submit more commands, you need to build another command buffer.
-// That's why it's fairly common to see those two steps collapsed into one like this:
-// device.queue.submit([encoder.finish()]);
-
+// Schedule updateGrid() to run repeatedly
+setInterval(updateGrid, UPDATE_INTERVAL);
