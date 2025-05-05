@@ -6,6 +6,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 `
 
 const GRID_SIZE = 32;
+const WORKGROUP_SIZE = 8;
 
 // const shaders =
 //     await Promise.all([
@@ -16,6 +17,7 @@ const GRID_SIZE = 32;
 
 import vertexShader from "./shaders/vertex.wgsl?raw"; // this is vite specific import stuff
 import fragmentShader from "./shaders/fragment.wgsl?raw"; // this is vite specific import stuff
+import computeShader from "./shaders/compute.wgsl?raw"; // this is vite specific import stuff
 
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
@@ -132,23 +134,12 @@ const cellShaderModule: GPUShaderModule = device.createShaderModule({
 //Note: You can also create a separate shader module for your vertex and fragment shaders, if you want. 
 // That can be beneficial if, for example, you want to use several different fragment shaders with the same vertex shader.
 
-// The render pipeline controls how geometry is drawn, including things like which shaders are used, how to interpret data in vertex buffers, which kind of geometry should be rendered (lines, points, triangles...)
-const cellPipeline: GPURenderPipeline = device.createRenderPipeline({
-    label: "Cell pipeline",
-    layout: "auto",
-    vertex: {
-        module: cellShaderModule,
-        entryPoint: "vertexMain",
-        buffers: [vertexBufferLayout]
-    },
-    fragment: {
-        module: cellShaderModule,
-        entryPoint: "fragmentMain",
-        targets: [{
-            format: canvasFormat
-        }]
-    }
+
+const simulationShaderModule = device.createShaderModule({
+    label: "Game of life simulation shader",
+    code: `${computeShader}`
 });
+
 
 
 
@@ -194,6 +185,26 @@ for (let i = 0; i < cellState.length; i++) {
 device.queue.writeBuffer(cellStateStorage[1], 0, cellState);
 
 
+const bindGroupLayout = device.createBindGroupLayout({
+    label: "Cell bind group layout",
+    entries: [{
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT,
+        buffer: {} // Grid uniform buffer
+    }, {
+        binding: 1, // Make sure that the binding of the new entry matches the @binding() of the corresponding value in the shader!
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT,
+        buffer: { type: "read-only-storage", } // Cell state input buffer
+    }, {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: "storage" } // Cell state output buffer
+    }]
+});
+
+
+
+
 
 // getBindGroupLayout(0), where the 0 corresponds to the @group(0) that you typed in the vertex shader.
 const bindGroups: Array<GPUBindGroup> = [
@@ -206,6 +217,9 @@ const bindGroups: Array<GPUBindGroup> = [
         }, {
             binding: 1, // Make sure that the binding of the new entry matches the @binding() of the corresponding value in the shader!
             resource: { buffer: cellStateStorage[0] }
+        }, {
+            binding: 2,
+            resource: { buffer: cellStateStorage[1] }
         }],
     }),
     device.createBindGroup({
@@ -217,9 +231,41 @@ const bindGroups: Array<GPUBindGroup> = [
         }, {
             binding: 1, // Make sure that the binding of the new entry matches the @binding() of the corresponding value in the shader!
             resource: { buffer: cellStateStorage[1] }
+        }, {
+            binding: 2,
+            resource: { buffer: cellStateStorage[0] }
         }],
     }),
 ];
+
+
+// A pipeline layout is a list of bind group layouts (in this case, you have one) that one or more pipelines use. 
+// The order of the bind group layouts in the array needs to correspond with the @group attributes in the shaders. 
+// (This means that bindGroupLayout is associated with @group(0).)
+const pipelineLayout = device.createPipelineLayout({
+    label: "Cell Pipeline Layout",
+    bindGroupLayouts: [bindGroupLayout],
+});
+
+
+// The render pipeline controls how geometry is drawn, including things like which shaders are used, how to interpret data in vertex buffers, which kind of geometry should be rendered (lines, points, triangles...)
+const cellPipeline: GPURenderPipeline = device.createRenderPipeline({
+    label: "Cell pipeline",
+    layout: pipelineLayout,
+    vertex: {
+        module: cellShaderModule,
+        entryPoint: "vertexMain",
+        buffers: [vertexBufferLayout]
+    },
+    fragment: {
+        module: cellShaderModule,
+        entryPoint: "fragmentMain",
+        targets: [{
+            format: canvasFormat
+        }]
+    }
+});
+
 
 
 const UPDATE_INTERVAL = 400; // Update every 200ms (5 times/sec)
