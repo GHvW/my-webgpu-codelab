@@ -206,6 +206,48 @@ const bindGroupLayout = device.createBindGroupLayout({
 
 
 
+
+
+
+// A pipeline layout is a list of bind group layouts (in this case, you have one) that one or more pipelines use. 
+// The order of the bind group layouts in the array needs to correspond with the @group attributes in the shaders. 
+// (This means that bindGroupLayout is associated with @group(0).)
+const pipelineLayout = device.createPipelineLayout({
+    label: "Cell Pipeline Layout",
+    bindGroupLayouts: [bindGroupLayout],
+});
+
+
+// The render pipeline controls how geometry is drawn, including things like which shaders are used, how to interpret data in vertex buffers, which kind of geometry should be rendered (lines, points, triangles...)
+const cellPipeline: GPURenderPipeline = device.createRenderPipeline({
+    label: "Cell pipeline",
+    layout: pipelineLayout,
+    vertex: {
+        module: cellShaderModule,
+        entryPoint: "vertexMain",
+        buffers: [vertexBufferLayout]
+    },
+    fragment: {
+        module: cellShaderModule,
+        entryPoint: "fragmentMain",
+        targets: [{
+            format: canvasFormat
+        }]
+    }
+});
+
+
+// Create a compute pipeline that updates the game state.
+const simulationPipeline: GPUComputePipeline = device.createComputePipeline({
+    label: "simulation pipeline",
+    layout: pipelineLayout,
+    compute: {
+        module: simulationShaderModule,
+        entryPoint: "computeMain",
+    }
+});
+
+
 // getBindGroupLayout(0), where the 0 corresponds to the @group(0) that you typed in the vertex shader.
 const bindGroups: Array<GPUBindGroup> = [
     device.createBindGroup({
@@ -237,36 +279,6 @@ const bindGroups: Array<GPUBindGroup> = [
         }],
     }),
 ];
-
-
-// A pipeline layout is a list of bind group layouts (in this case, you have one) that one or more pipelines use. 
-// The order of the bind group layouts in the array needs to correspond with the @group attributes in the shaders. 
-// (This means that bindGroupLayout is associated with @group(0).)
-const pipelineLayout = device.createPipelineLayout({
-    label: "Cell Pipeline Layout",
-    bindGroupLayouts: [bindGroupLayout],
-});
-
-
-// The render pipeline controls how geometry is drawn, including things like which shaders are used, how to interpret data in vertex buffers, which kind of geometry should be rendered (lines, points, triangles...)
-const cellPipeline: GPURenderPipeline = device.createRenderPipeline({
-    label: "Cell pipeline",
-    layout: pipelineLayout,
-    vertex: {
-        module: cellShaderModule,
-        entryPoint: "vertexMain",
-        buffers: [vertexBufferLayout]
-    },
-    fragment: {
-        module: cellShaderModule,
-        entryPoint: "fragmentMain",
-        targets: [{
-            format: canvasFormat
-        }]
-    }
-});
-
-
 
 const UPDATE_INTERVAL = 400; // Update every 200ms (5 times/sec)
 let step = 0; // Track how many simulation steps have been run
