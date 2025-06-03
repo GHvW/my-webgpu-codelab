@@ -286,10 +286,22 @@ let step = 0; // Track how many simulation steps have been run
 
 // Move all of our rendering code into a function
 function updateGrid() {
+    const encoder = device.createCommandEncoder();
+
+    // start compute pass
+    const computePass = encoder.beginComputePass();
+
+    computePass.setPipeline(simulationPipeline);
+    computePass.setBindGroup(0, bindGroups[step % 2]);
+
+    const workgroupCount = Math.ceil(GRID_SIZE / WORKGROUP_SIZE);
+    computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
+
+    computePass.end();
+
     step++; // Increment the step count
 
     // Start a render pass 
-    const encoder = device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
         colorAttachments: [{
             view: context.getCurrentTexture().createView(),
