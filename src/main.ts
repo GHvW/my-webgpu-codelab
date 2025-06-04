@@ -173,7 +173,8 @@ const cellStateStorage: Array<GPUBuffer> = [
 
 // Mark every third cell of the grid as active.
 for (let i = 0; i < cellState.length; i += 3) {
-    cellState[i] = 1;
+    // cellState[i] = 1;
+    cellState[i] = Math.random() > 0.6 ? 1 : 0; // produce a random buffer on each page load
 }
 // once written to the buffer, its in the GPU memory, so we can reuse the cellState array once written
 device.queue.writeBuffer(cellStateStorage[0], 0, cellState);
